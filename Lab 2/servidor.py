@@ -48,23 +48,29 @@ def main():
     sock.bind((HOST, PORTA)) #Vincula a interface e porta para comunicação
     sock.listen(5)  #Coloca o processo em modo de espera pela a conexão. O argumento define o limite máximo de conexões pendentes
 
+    print('Aguardando conexão...')
     novoSock, endereco = sock.accept() #Aceita a primeira conexão da fila e retorna um novo socket e o endereço do par ao qual se conectou. OBS: A chamada pode ser bloqueante
-    print ('Conectado com: ', endereco)
+    print ('Conectado com: ', endereco,'\n')
 
     while (True) :
-        
-        request_msg = novoSock.recv(1024) #Recebe a mensagem do processo ativo
-        if (not request_msg):
-            break 
-        else:
-            print("Mensagem recebida!")
-            request = json.loads(request_msg) #Tranformar a mensagem recebida em um dicionário
-            
-            response = handler(request) #Realiza o processamento da solicitação
 
+        request_msg = novoSock.recv(1024) #Recebe a mensagem do processo ativo
+        print("Mensagem recebida!")
+        request = json.loads(request_msg) #Tranformar a mensagem recebida em um dicionário
+       
+        if (request['file_name'] == '#' or request['word'] == '#'):
+        
+            print('\nConexão com: ', endereco,'fechada!')
+            print('Aguardando conexão...')
+            novoSock, endereco = sock.accept() #Aceita a primeira conexão da fila e retorna um novo socket e o endereço do par ao qual se conectou. OBS: A chamada pode ser bloqueante
+            print ('Conectado com: ', endereco,'\n')
+        
+        else:     
+         
+            response = handler(request) #Realiza o processamento da solicitação
             response_msg = json.dumps(response, ensure_ascii=False) #Gera o json para o envio da resposta ao cliente
             novoSock.send(bytes(response_msg,  encoding='utf-8')) #Envia mensagem de resposta para o processo ativo
-            print("Mensagem devolvida!")
+            print("Mensagem devolvida!\n")
 
     novoSock.close() #Fecha o socket
     sock.close()  #Fecha o socket principal

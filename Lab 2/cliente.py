@@ -39,10 +39,13 @@ def main():
     request = {'file_name': file_name, 'word': word}
     request_msg = json.dumps(request, ensure_ascii=False) #Gera o json para o envio da requisição ao servidor
 
-    while(file_name != '#' and word != '#' ):
+    while(True):
         
         sock.send(bytes(request_msg,  encoding='utf-8')) #Envio da mensagem para o processo passivo
         
+        if(file_name == '#' or word == '#'):
+            break
+
         response_msg = sock.recv(1024) #Recebimento da mensagem enviada pelo processo passivo. OBS: chamada pode ser bloqueante e o argumento indica o tamanho máximo de bytes da msg.
         response = json.loads(response_msg) #Tranformar a mensagem recebida em um dicionário.
 
