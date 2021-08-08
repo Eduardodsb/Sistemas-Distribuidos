@@ -12,7 +12,7 @@ O mesmo continua se comunicando com o servidor por meio de jsons.
 
 Quanto ao servidor o mesmo passou a atender de forma concorrente mais de um cliente
 e para isso foi utilizado multiprocessos. Além disso, o servidor também passou a permitir a leitura do que é digitado no terminal.
-Os comandos disoníveis são:
+Os comandos disponíveis são:
 
 <b>fim:</b> Finaliza o servidor. (OBS: Após esse comando outros comandos não serão aceitos.).<br>
 <b>hist conexoes:</b> Histórico de todas as conexões que foram realizadas com servidor.<br>
