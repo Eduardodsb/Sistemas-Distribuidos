@@ -4,10 +4,10 @@ import threading
 import json
 import sys
 import os 
-from user import User
+from dataLayer import DataLayer
 
 class Server:
-
+    
     def __init__(self, host = '', port = 5000, pending_conn = 5, blocking = True):
         self.SERVER_IS_ALIVE     = True
         self.host                = host #'' possibilita acessar qualquer endereco alcancavel da maquina local 
@@ -17,8 +17,9 @@ class Server:
         self.connections         = {} #Armazena histórico de conexões
         self.workers             = [] #Armazena as threads criadas.
         self.pending_conn        = pending_conn #Número de conexões que o servidor espera
-        self.users               = {} #Armazena os usuários
-
+        self.processLayer        = ProcessLayer()
+        self.processLayer.readUsers()
+        
         self.start()
 
     def start(self):
@@ -43,14 +44,14 @@ class Server:
             request = json.loads(request_msg) #Tranformar a mensagem recebida em um dicionário
 
             # Dicionário que guarda as chamadas dos métodos
-            invokableMethods = {'logout'         : logoutClient(request['data']['userName']), 
-                                'createAccount'  : createClientAccount(request['data']['userName'], request['data']['password']),
-                                'deleteAccount'  : deleteClientAccount(request['data']['userName'], request['data']['password']),
-                                'authAccount'    : authClientAccount(request['data']['userName'],   request['data']['password']),
-                                'getMyStatus'    : getClientStatus(ipAddress),
-                                'setMyStatus'    : setClientStatus(ipAddress, request['data']['status']),
-                                'getUsers'       : getUsersList(),
-                                'methodNotFound' : methodNotFound()
+            invokableMethods = {'logout'         : self.processLayer.logoutClient(request['data']['userName'], request['data']['password']), 
+                                'createAccount'  : self.processLayer.createClientAccount(request['data']['userName'], request['data']['password']),
+                                'deleteAccount'  : self.processLayer.deleteClientAccount(request['data']['userName'], request['data']['password']),
+                                'authAccount'    : self.processLayer.authClientAccount(request['data']['userName'],   request['data']['password'], ipAddress),
+                                'getMyStatus'    : self.processLayer.getClientStatus(request['data']['userName'], request['data']['password']),
+                                'setMyStatus'    : self.processLayer.setClientStatus(request['data']['userName'], request['data']['password'], request['data']['status']),
+                                'getUsers'       : self.processLayer.getUsersList(),
+                                'methodNotFound' : self.processLayer.methodNotFound(request['method'])
                                 }
 
             response = invokableMethods.get(request['method'], invokableMethods['methodNotFound'])
@@ -60,7 +61,7 @@ class Server:
             print(f'Mensagem devolvida para {ipAddress}!\n')
 
     def stop(self):
-        self.saveData()
+        self.processLayer.saveUsers()
 
         self.sock.close()
         self.SERVER_IS_ALIVE = False

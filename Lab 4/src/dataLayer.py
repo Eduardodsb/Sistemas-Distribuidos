@@ -15,7 +15,7 @@ class DataLayer:
             content = json.load(f)
             new_content = {}
             for key, value in content.items():
-                new_content[key] = User(value['nickname'],value['password'],int(value['status']),value['ip'],int(value['port']))
+                new_content[key] = User(value['userName'],value['password'],int(value['status']),value['ip'],int(value['port']))
             
             f.close()
             
@@ -31,7 +31,7 @@ class DataLayer:
 
             new_users = {}
             for key, value in users.items():
-                new_users[key] = json.loads(str(value))
+                new_users[key] = json.loads(value.__str__(True, True, True, True, True))
             
             content = json.dump(new_users, f)
 
