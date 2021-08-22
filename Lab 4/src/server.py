@@ -4,7 +4,7 @@ import threading
 import json
 import sys
 import os 
-from dataLayer import DataLayer
+from processLayer import ProcessLayer
 
 class Server:
     
@@ -35,26 +35,35 @@ class Server:
 
         return newSock, ipAddress
     
-    def handleRequest(clientSock, ipAddress):
+    def handleRequest(self, clientSock, ipAddress):
 
         while True:
             request_msg = clientSock.recv(1024) #Recebe a mensagem do processo ativo
             print(f'Mensagem recebida de {ipAddress}!')
             
+            if(request_msg == b''):
+                break
+
             request = json.loads(request_msg) #Tranformar a mensagem recebida em um dicionário
 
             # Dicionário que guarda as chamadas dos métodos
-            invokableMethods = {'logout'         : self.processLayer.logoutClient(request['data']['userName'], request['data']['password']), 
-                                'createAccount'  : self.processLayer.createClientAccount(request['data']['userName'], request['data']['password']),
-                                'deleteAccount'  : self.processLayer.deleteClientAccount(request['data']['userName'], request['data']['password']),
-                                'authAccount'    : self.processLayer.authClientAccount(request['data']['userName'],   request['data']['password'], ipAddress),
-                                'getMyStatus'    : self.processLayer.getClientStatus(request['data']['userName'], request['data']['password']),
-                                'setMyStatus'    : self.processLayer.setClientStatus(request['data']['userName'], request['data']['password'], request['data']['status']),
-                                'getUsers'       : self.processLayer.getUsersList(),
-                                'methodNotFound' : self.processLayer.methodNotFound(request['method'])
-                                }
-
-            response = invokableMethods.get(request['method'], invokableMethods['methodNotFound'])
+            
+            if(request['method'] == 'logout'):
+                response = self.processLayer.logoutClient(request['data']['userName'], request['data']['password'])
+            elif(request['method'] == 'createAccount'):
+                response = self.processLayer.createClientAccount(request['data']['userName'], request['data']['password'])
+            elif(request['method'] == 'deleteAccount'):
+                response = self.processLayer.deleteClientAccount(request['data']['userName'], request['data']['password'])
+            elif(request['method'] == 'authAccount'):
+                response = self.processLayer.authClientAccount(request['data']['userName'], request['data']['password'], ipAddress)
+            elif(request['method'] == 'getMyStatus'):
+                response = self.processLayer.getClientStatus(request['data']['userName'], request['data']['password'])                
+            elif(request['method'] == 'setMyStatus'):
+                response = self.processLayer.setClientStatus(request['data']['userName'], request['data']['password'], request['data']['status'])
+            elif(request['method'] == 'getUsers'):
+                response = self.processLayer.getUsersList()
+            else:
+                response = self.processLayer.methodNotFound(request['method'])
            
             response_msg = json.dumps(response, ensure_ascii=False) #Gera o json para o envio da resposta ao cliente
             clientSock.send(bytes(response_msg,  encoding='utf-8')) #Envia mensagem de resposta para o processo ativo
@@ -65,6 +74,10 @@ class Server:
 
         self.sock.close()
         self.SERVER_IS_ALIVE = False
+
+        for item in self.connections:
+            item.close()
+
         print('Servidor finalizado!')
 
     def run(self):
@@ -72,43 +85,47 @@ class Server:
         print('Servidor está pronto para receber conexões.')
 
         while (self.SERVER_IS_ALIVE) :
-            #espera por qualquer entrada de interesse
-            read, write, exception = select.select(self.inputs, [], [])
-            
-            for trigger in read:
-                if trigger == self.sock: #Caso o trigger seja um nova conexão
-                    clientSock, ipAddress        = self.acceptConnection()
-                    self.connections[clientSock] = ipAddress #Guarda a nova conexão
-                    
-                    worker                      = threading.Thread(target=handleRequest, args=(clientSock,ipAddress))
-                    worker.start()
-                    self.workers.append(worker)
+
+            try:
+                #espera por qualquer entrada de interesse
+                read, write, exception = select.select(self.inputs, [], [])
                 
-                elif trigger == sys.stdin:
-                    cmd = input().lower()
-                    
-                    if (cmd == 'fim'):
-                        if(threading.active_count() - 1 != 0):
-                            print('\nExistem conexões abertas com clientes.')
-                            print('Novas conexões não serão aceitas.')
-                            print('Aguardando a finalização dos clientes existentes...')
-
-                            for c in self.workers: #Aguarda todos os processos terminarem
-                                c.join()
-
-                            print('Todos os clientes terminaram de usar o servidor.')
-
-                        self.stop()
+                for trigger in read:
+                    if trigger == self.sock: #Caso o trigger seja um nova conexão
+                        clientSock, ipAddress        = self.acceptConnection()
+                        self.connections[clientSock] = ipAddress #Guarda a nova conexão
                         
-                    elif (cmd == 'hist'):
-                        print('\nHistórico de conexões:', list(self.connections.values()))
-                        
-                    elif (cmd == 'ativos'):
-                        print(f'\nExistem {threading.active_count() - 1} clientes ativos.')
+                        worker                      = threading.Thread(target=self.handleRequest, args=(clientSock,ipAddress))
+                        worker.start()
+                        self.workers.append(worker)
                     
-                    else:
-                        print("\nComando não existe.")
+                    elif trigger == sys.stdin:
+                        cmd = input().lower()
+                        
+                        if (cmd == 'fim'):
+                            if(threading.active_count() - 1 != 0):
+                                print('\nExistem conexões abertas com clientes.')
+                                print('Novas conexões não serão aceitas.')
+                                print('Aguardando a finalização dos clientes existentes...')
 
+                                for c in self.workers: #Aguarda todos os processos terminarem
+                                    c.join()
+
+                                print('Todos os clientes terminaram de usar o servidor.')
+
+                            self.stop()
+                            
+                        elif (cmd == 'hist'):
+                            print('\nHistórico de conexões:', list(self.connections.values()))
+                            
+                        elif (cmd == 'ativos'):
+                            print(f'\nExistem {threading.active_count() - 1} clientes ativos.')
+                        
+                        else:
+                            print("\nComando não existe.")
+            except Exception as e:
+                print(e)
+                self.stop()
 
 if __name__ == '__main__':
     

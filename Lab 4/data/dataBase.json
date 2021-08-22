@@ -1,1 +1,1 @@
-{"admin": {"userName": "admin", "password": "123", "status": "1", "ip": "123.12.123.1", "port": 5050}, "admin2": {"userName": "admin2", "password": "123", "status": "0", "ip": "", "port": 0}}
+{"admin": {"userName": "admin", "password": "123", "status": "-1", "ip": "", "port": 0}, "admin2": {"userName": "admin2", "password": "123", "status": "1", "ip": "123.12.123.1", "port": 5050}, "edu": {"userName": "edu", "password": "123", "status": "-1", "ip": "", "port": 0}}

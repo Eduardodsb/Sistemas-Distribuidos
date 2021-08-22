@@ -32,7 +32,10 @@ class ProcessLayer:
 
     def saveUsers(self):
         try:
+            ProcessLayer.lock.acquire()
+            print(ProcessLayer.users)
             ProcessLayer.datalayer.writeUsers(ProcessLayer.users)
+            ProcessLayer.lock.release()
         except Exception as e:
             print(e)
     
