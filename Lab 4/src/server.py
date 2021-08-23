@@ -55,7 +55,7 @@ class Server:
             elif(request['method'] == 'deleteAccount'):
                 response = self.processLayer.deleteClientAccount(request['data']['userName'], request['data']['password'])
             elif(request['method'] == 'authAccount'):
-                response = self.processLayer.authClientAccount(request['data']['userName'], request['data']['password'], ipAddress)
+                response = self.processLayer.authClientAccount(request['data']['userName'], request['data']['password'], (ipAddress[0], request['data']['port']))
             elif(request['method'] == 'getMyStatus'):
                 response = self.processLayer.getClientStatus(request['data']['userName'], request['data']['password'])                
             elif(request['method'] == 'setMyStatus'):
