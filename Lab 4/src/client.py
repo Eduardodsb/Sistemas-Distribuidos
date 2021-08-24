@@ -4,6 +4,7 @@ import threading
 import json
 import sys
 import os
+import random
 from clientInterface import ClientInterface
 from constants import LOGIN, LOGOUT, CREATE_ACCOUNT, DELETE_ACCOUNT, EXIT, ACTIVE_USERS, ACTIVE_STATUS, INACTIVE_STATUS, OPEN_CHAT, CLOSE_CHAT, DELETE_MESSAGES, OPEN_HIST_MESSAGES, CLOSE_HIST_MESSAGES, SEND_MESSAGE
 
@@ -33,7 +34,7 @@ class Client:
 
         ip = socket.gethostbyname(socket.gethostname())
 
-        for port in range(2000,65535):
+        for port in range(random.randrange(2000,4000),65535):
             try:
                 serv = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
                 serv.bind((ip,port))
@@ -92,8 +93,10 @@ class Client:
         if(method == LOGIN and response['status'] == 'success'):
             userName, password = userInput
             self.userName      = userName
+            self.clientView.username = self.userName
             self.password      = password
             self.status        = 1
+
             work = threading.Thread(target= self.runAsPassive_P2P, args=())
             work.start()
 
@@ -113,7 +116,7 @@ class Client:
                 self.chatUsersPorts[element['userName']]     = element['port']
                 self.chatUsersStatus[element['userName']]    = element['status']
             self.lock.release()
-            print(self.chatUsersStatus)
+
             response = {'method':'openChat', 'status': 'success', 'data':{'message': None} }
             return response
         
@@ -123,59 +126,73 @@ class Client:
 
     def channelMessage(self, chatUserName, clientSock):
         request_msg = None
+
+        if(chatUserName not in self.openChatMessages):
+            self.openChatMessages[chatUserName] = []
+
         while True:
+            #print('hehe')
             try:
                 request_msg = clientSock.recv(1024) #Recebe a mensagem do processo ativo
             except socket.timeout as e:
                 pass
-
+            #print('parte 1')
             if(request_msg == b''): #Entra se receber logout ou esse cara
                 self.lock.acquire()
                 self.openChat[chatUserName] = 0
                 self.lock.release()
                 clientSock.close()
                 break
-
+            #print('parte 2')
             if(request_msg != None):
                 #Mensagem de confirmação de recebimento de requisição
-                notifyReceivementMsg = {'method': 'sendMessage', 'status': 'success', 'data': None}
-                notifyReceivement = json.dumps(notifyReceivementMsg, ensure_ascii=False) #Gera o json para o envio da requisição ao servidor
-                clientSock.send(bytes(notifyReceivement,  encoding='utf-8')) #Envio da mensagem para o processo passivo
-                
-                if(request['method'] == 'logout'):
+                # notifyReceivementMsg = {'method': 'sendMessage', 'status': 'success', 'data': None}
+                # notifyReceivement = json.dumps(notifyReceivementMsg, ensure_ascii=False) #Gera o json para o envio da requisição ao servidor
+                # clientSock.send(bytes(notifyReceivement,  enlocoding='utf-8')) #Envio da mensagem para o processo passivo
+                #print('parte 3')
+ 
+                request_msg = str(request_msg, encoding='utf-8').replace('}{','}-#-{').split('-#-')
+                for r in request_msg:
+                    request = json.loads(r)                
+                    if(request['method'] == 'logout'):
+                        self.lock.acquire()
+                        self.openChat[chatUserName] = 0
+                        self.lock.release()
+                        clientSock.close()
+                        break
+                    #print('parte 4')
                     self.lock.acquire()
-                    self.openChat[chatUserName] = 0
+                    self.openChatMessages[chatUserName].append(chatUserName + ":" + request['data']['message'])
                     self.lock.release()
-                    clientSock.close()
-                    break
-
-                self.lock.acquire()
-                self.openChatMessages[chatUserName].append(chatUserName + ":" + request['data']['message'])
-                self.lock.release()
-                
+            #print('parte 5')        
             self.lock.acquire()
-            for i in len(self.fifoMessages[chatUserName]):
+            for i in range(len(self.fifoMessages.get(chatUserName,[]))):
                 msg = self.fifoMessages[chatUserName][0] # {'fabio_Junior19': ["você:ola", "fabio_Junior19:ola", "fabio_Junior19:tudobom?"]}    
                 request = {'method': 'sendMessage', 'data':{'userName': self.userName, 'message': msg}}
                 request_msg = json.dumps(request, ensure_ascii=False) #Gera o json para o envio da requisição ao servidor
                 clientSock.send(bytes(request_msg,  encoding='utf-8')) #Envio da mensagem para o processo passivo
-                
-                clientSock.setblocking(True)
-                request_msg = clientSock.recv(1024) #Recebe a mensagem do processo ativo
-                if(request_msg == b''): #Entra se receber logout ou esse cara
-                    self.lock.acquire()
-                    self.openChat[chatUserName] = 0
-                    self.lock.release()
-                    clientSock.close()
-                    break
-                
-                request = json.loads(request_msg)
-                if(request['status'] == 'success'):
-                    self.fifoMessages[chatUserName].pop(0)
-            self.lock.release()
+                #print('parte 6')
+                # clientSock.setblocking(True)
 
+                # request_msg = clientSock.recv(1024) #Recebe a mensagem do processo ativo
+                # if(request_msg == b''): #Entra se receber logout ou esse cara
+                #     self.openChat[chatUserName] = 0
+                #     clientSock.close()
+                #     break
+                # #print('parte 7')
+                # request = json.loads(request_msg)
+                # print('testando request')
+                # print(request)
+                # if(request['status'] == 'success'):
+                self.fifoMessages[chatUserName].pop(0)
+            #print('parte 8')
+            self.clientView.messages_queue = self.openChatMessages
+            if(self.clientView.openChatFriendUser == chatUserName):
+                self.clientView.printChatScreen()
+            self.lock.release()
+            #print('parte 9')
             clientSock.setblocking(False)
-            clientSock.settimeout(10.0)
+            clientSock.settimeout(0.5)
             request_msg = None
     
     def runAsActive_P2P(self, userInput):
@@ -185,19 +202,20 @@ class Client:
 
                 sock_active = socket.socket()
                 sock_active.connect((self.chatUsersIps[userInput[5:]], self.chatUsersPorts[userInput[5:]])) #Abertura da conexão com o processo passivo
-                sock_active.setblocking(True) #Configura o sock para o modo não-bloqueante
-                print( 'aqui', self.userName)
+                sock_active.setblocking(True) #Configura o sock para o modo bloqueante
+
                 request     = {'method': 'sendMessage', 'data':{'userName': self.userName, 'message': 'hand shake'}}
                 request_msg = json.dumps(request, ensure_ascii=False) #Gera o json para o envio da requisição ao servidor
                 sock_active.send(bytes(request_msg,  encoding='utf-8')) #Envio da mensagem para o processo passivo
                 
                 
                 handshakeMsg            = sock_active.recv(1024)
-                print(handshakeMsg)
                 handshakeMsgDict        = json.loads(handshakeMsg)
-                print('aqui 3 ')
+
                 self.lock.acquire()
                 if(handshakeMsgDict['data']['userName'] != '' and handshakeMsgDict['data']['message'] == 'success'):
+                    sock_active.setblocking(False)
+                    sock_active.settimeout(0.5)
                     worker = threading.Thread(target=self.channelMessage, args=(handshakeMsgDict['data']['userName'], sock_active))
                     worker.start()
 
@@ -235,14 +253,13 @@ class Client:
                         try:                    
                             clientSock, ipAddress   = sock.accept() #Aceita a primeira conexão da fila e retorna um novo socket e o endereço do par ao qual se conectou. OBS: A chamada pode ser bloqueante
                             clientSock.setblocking(False)
-                            clientSock.settimeout(10.0)
+                            clientSock.settimeout(0.5)
 
                             handshakeMsg            = clientSock.recv(1024)
                             self.lock.acquire()
                             handshakeMsgDict        = json.loads(handshakeMsg)
-                            print(self.chatUsersStatus)
+
                             if((handshakeMsgDict['data']['userName'] != '') and (self.chatUsersStatus[handshakeMsgDict['data']['userName']] == '1') and ((not handshakeMsgDict['data']['userName'] in self.openChat)  or (handshakeMsgDict['data']['userName'] in self.openChat and self.openChat[handshakeMsgDict['data']['userName']] == 0))):
-                                print('hoho')
                                 self.openChat[handshakeMsgDict['data']['userName']]         = 1
                                 chatUserName = handshakeMsgDict['data']['userName'] 
                                 self.openChatMessages[handshakeMsgDict['data']['userName']] = []# {'fabio_Junior19': ["você:ola", "fabio_Junior19:ola", "fabio_Junior19:tudobom?"]}
@@ -252,13 +269,11 @@ class Client:
                                 handshakeMsgDict['data']                                    = {'userName':self.userName,'message':'success'}
                                 handshakeMsg                                                = json.dumps(handshakeMsgDict, ensure_ascii=False) #Gera o json para o envio da requisição ao servidor
                                 
-                                print(handshakeMsgDict)
-                                print(handshakeMsg)
                                 clientSock.send(bytes(handshakeMsg,  encoding='utf-8')) #Envio da mensagem para o processo passivo
                                 self.lock.release()
-                                worker                                                       = threading.Thread(target=self.channelMessage, args=(chatUserName. clientSock))
+                                self.clientView.refreshNotification(self.clientView.currScreen, f'{chatUserName} iniciou um chat com você! Digite "chat:{chatUserName} para abrir o chat."', add = True)
+                                worker                                                       = threading.Thread(target=self.channelMessage, args=(chatUserName, clientSock))
                                 worker.start()
-                                print('show')
                             else:
                                 self.lock.release()
                                 clientSock.close()
@@ -275,7 +290,7 @@ class Client:
 
     def run(self):
 
-        userInput = self.clientView.homeScreen()
+        userInput, msg = self.clientView.homeScreen()
         while (userInput != EXIT):
             if(userInput == CREATE_ACCOUNT):
                 userInput = self.clientView.createAccountScreen()
@@ -290,6 +305,9 @@ class Client:
             elif(userInput == LOGIN):
                 userInput = self.clientView.authScreen()
                 response  = self.handlerServerRequest(LOGIN, userInput)
+                if(response['status'] == 'success'):
+                    responseUpdate = self.handlerServerRequest(ACTIVE_USERS, None)
+                    self.handleServerResponse(OPEN_CHAT,responseUpdate,None)
                 self.handleServerResponse(LOGIN, response, userInput)
                 self.clientView.handlerResponse(response)
             
@@ -308,22 +326,39 @@ class Client:
                 self.clientView.handlerResponse(response)
 
             elif(userInput[0:5] == OPEN_CHAT):
-                response = self.handlerServerRequest(ACTIVE_USERS, None)
-                response = self.handleServerResponse(OPEN_CHAT,response,None)
-                if(response['status'] == 'success'):
-                    response = self.runAsActive_P2P(userInput)
+                if(userInput[:5] == OPEN_CHAT and self.status == 1 and self.chatUsersStatus[userInput[5:]] == '1'
+                and (userInput[5:] in self.openChat and self.openChat[userInput[5:]] == 1)):
+                    response = {'method':'openChat', 'status': 'success', 'data':{'message': None} }
+                    self.clientView.openChatFriendUser = userInput[5:]
+                else:
+                    response = self.handlerServerRequest(ACTIVE_USERS, None)
+                    response = self.handleServerResponse(OPEN_CHAT,response,None)
+                    if(response['status'] == 'success'):
+                        response = self.runAsActive_P2P(userInput)
+                        if(response['status'] == 'success'):
+                            self.clientView.openChatFriendUser = userInput[5:]
                 self.clientView.handlerResponse(response)
-                
-                #Chamar a janela de chat com fulaninho
-
+            
             elif(userInput == LOGOUT):
                 response = self.handlerServerRequest(LOGOUT, None)
                 self.clientView.handlerResponse(response)
                 result = self.handleServerResponse(LOGOUT,response,None)
                 if(result):
                     break
+            
+            elif(userInput == SEND_MESSAGE):
+                print('entrei')
+                self.lock.acquire()
+                print('openchatmessages print:')
+                print(self.openChatMessages)
+                self.openChatMessages[self.clientView.openChatFriendUser].append(self.userName + ":" + msg)
+                if(self.clientView.openChatFriendUser not in self.fifoMessages):
+                     self.fifoMessages[self.clientView.openChatFriendUser] = []
+                self.fifoMessages[self.clientView.openChatFriendUser].append(msg)
+                self.lock.release()
+                print('sai')
 
-            userInput = self.clientView.redirectScreen()
+            userInput, msg = self.clientView.redirectScreen()
         
         self.handlerServerRequest(EXIT,None)
         self.stop()

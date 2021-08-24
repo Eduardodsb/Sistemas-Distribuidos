@@ -11,12 +11,14 @@ class ClientInterface:
         self.notifications_queue_hist   = []
         self.messages_queue             = {} # {'fabio_Junior19': ["você:ola", "fabio_Junior19:ola", "fabio_Junior19:tudobom?"]}
         self.MAX_MSGS_SHOW              = 5
+        self.openChatFriendUser         = ""
+        self.username                   = ""
 
     def homeScreen(self):
         self.currScreen = HOME_SCR
         
         if(self.notifications_queue):
-            print(self.notifications_queue.pop(0))
+            print(self.notifications_queue[len(self.notifications_queue) - 1])
 
         print('<=====Seja Bem-vindo ao Bate Papo ERT=====>\n')
         print(f'Digite "{LOGIN}" para login.')
@@ -32,13 +34,13 @@ class ClientInterface:
         if(userInput == EXIT):
             print("Ficamos triste por sair, mas esperamos vê-lo em breve.")
 
-        return userInput
+        return (userInput, None)
 
     def authScreen(self):
         self.currScreen = LOGIN_SCR
 
         if(self.notifications_queue):
-            print(self.notifications_queue.pop(0))
+            print(self.notifications_queue[len(self.notifications_queue) - 1])
 
         print('<=====Fazendo o Login=====>')
 
@@ -54,7 +56,7 @@ class ClientInterface:
         self.currScreen = CREATE_ACCOUNT_SCR
 
         if(self.notifications_queue):
-            print(self.notifications_queue.pop(0))
+            print(self.notifications_queue[len(self.notifications_queue) - 1])
 
         print('<=====Criando Seu Perfil=====>\n')
         
@@ -70,7 +72,7 @@ class ClientInterface:
         self.currScreen = DELETE_ACCOUNT_SCR
 
         if(self.notifications_queue):
-            print(self.notifications_queue.pop(0))
+            print(self.notifications_queue[len(self.notifications_queue) - 1])
 
         print('<=====Deletando o Perfil=====>')
         
@@ -82,19 +84,8 @@ class ClientInterface:
 
         return userName, userPassword
 
-    def principalMenuScreen(self):
+    def readPrincipalMenuScreen(self):
         self.currScreen = PRINCIPAL_MENU_SCR
-
-        if(self.notifications_queue):
-            print(self.notifications_queue.pop(0))
-
-        print('<=====Menu Principal=====>\n')
-        print(f'Digite "{ACTIVE_USERS}" para visualizar usuários ativos.')
-        print(f'Digite "{ACTIVE_STATUS}" para tornar seu status ativo.')
-        print(f'Digite "{INACTIVE_STATUS}" para tornar seu status inativo.')
-        print(f'Digite "chat: nome_login" para abrir o chat de conversa com o usuário "nome_login". Por exemplo: {OPEN_CHAT}fabio_Junior19')
-        print(f'Digite "{SHOW_NOTIFICATIONS}" mostrar as 5 últimas notificações.')
-        print(f'Digite "{LOGOUT}" para se deslogar da sua conta.\n')
 
         userInput = input()
         while (userInput not in [LOGOUT, ACTIVE_USERS, ACTIVE_STATUS, INACTIVE_STATUS, SHOW_NOTIFICATIONS]) and (userInput[:5] != OPEN_CHAT):
@@ -103,7 +94,7 @@ class ClientInterface:
         
         if(userInput == SHOW_NOTIFICATIONS):
             clear = lambda: os.system('clear')
-            #clear()
+            clear()
 
             msg = "-------\nNOTIFICAÇÕES\n"
             tam_noti_hist = len(self.notifications_queue_hist)
@@ -117,15 +108,33 @@ class ClientInterface:
 
             print(msg)
 
-        return userInput
+        return (userInput, None)
 
-    def chatScreen(self, chat_user):
+    def printPrincipalMenuScreen(self):
+        clear = lambda: os.system('clear')
+        clear()
+        self.currScreen = PRINCIPAL_MENU_SCR
+
+        if(self.notifications_queue):
+            print(self.notifications_queue[len(self.notifications_queue) - 1])
+
+        print('<=====Menu Principal=====>\n')
+        print(f'Digite "{ACTIVE_USERS}" para visualizar usuários ativos.')
+        print(f'Digite "{ACTIVE_STATUS}" para tornar seu status ativo.')
+        print(f'Digite "{INACTIVE_STATUS}" para tornar seu status inativo.')
+        print(f'Digite "chat: nome_login" para abrir o chat de conversa com o usuário "nome_login". Por exemplo: {OPEN_CHAT}fabio_Junior19')
+        print(f'Digite "{SHOW_NOTIFICATIONS}" mostrar as 5 últimas notificações.')
+        print(f'Digite "{LOGOUT}" para se deslogar da sua conta.\n')
+
+    def printChatScreen(self):
+        clear = lambda: os.system('clear')
+        clear()
         self.currScreen = CHAT_SCR
 
         if(self.notifications_queue):
-            print(self.notifications_queue.pop(0))
+            print(self.notifications_queue[len(self.notifications_queue) - 1])
 
-        print('<===== CHAT: '+ str(chat_user) + ' =====>\n')
+        print('<===== CHAT: '+ str(self.openChatFriendUser) + ' =====>\n')
         print(f'Digite "{CLOSE_CHAT}" para fechar o chat.')
         print(f'Digite "{DELETE_MESSAGES}" para apagar mensagens do chat.')
         print(f'Digite "{OPEN_HIST_MESSAGES}" para abrir o histórico de mensagens com este usuário.')
@@ -133,20 +142,23 @@ class ClientInterface:
         print('Digite sua mensagem a ser enviada para este usuário.')
         print('<==============>\n')
 
-        i = 1
-        while(i <= self.MAX_MSGS_SHOW):
-            if(self.messages_queue[chat_user]):
-                print(self.messages_queue[chat_user][-i])
-                i += 1
+        if(self.openChatFriendUser not in self.messages_queue):
+            self.messages_queue[self.openChatFriendUser] = []
+        messagesToPrint = self.messages_queue[self.openChatFriendUser][-self.MAX_MSGS_SHOW:]
+
+        i = 0
+        while (i < len(messagesToPrint)):
+            if(messagesToPrint):
+                print(messagesToPrint[i])
+            i += 1
+
+    def readChatScreen(self):
+        self.currScreen = CHAT_SCR
 
         userInput = input()
         if(userInput not in [CLOSE_CHAT, DELETE_MESSAGES, OPEN_HIST_MESSAGES, CLOSE_HIST_MESSAGES]):
-            msg = "você:" + userInput
-            msg = msg.rjust(len(msg))
-            self.messages_queue[chat_user].append(msg)
             return (SEND_MESSAGE, userInput)
-
-        return userInput
+        return (userInput, None)
             
     def handlerResponse(self, response):
         if(response['method'] == 'createAccount'):
@@ -196,7 +208,7 @@ class ClientInterface:
             else:
                 self.notification(PRINCIPAL_MENU_SCR, "Não foi possível abrir o chat. Tente novamente.")
 
-    def redirectScreen(self, *args):
+    def redirectScreen(self):
         if(self.currScreen == HOME_SCR):
             userInput = self.homeScreen()
 
@@ -210,10 +222,14 @@ class ClientInterface:
             userInput = self.authScreen()
         
         elif(self.currScreen == PRINCIPAL_MENU_SCR):
-            userInput = self.principalMenuScreen()
+            self.printPrincipalMenuScreen()
+            userInput = self.readPrincipalMenuScreen()
 
         elif(self.currScreen == CHAT_SCR):
-            userInput = self.chatScreen()
+            self.printChatScreen()
+            print('querida cheguei')
+            userInput = self.readChatScreen()
+            print('querida cheguei 1')
 
         else:
             userInput = self.homeScreen()
@@ -244,13 +260,27 @@ class ClientInterface:
 
     def notification(self, screen, message, add = True):
         clear = lambda: os.system('clear')
-        #clear()
+        clear()
         
         self.notifications_queue.append(">>>> " + message + "\n")
         if(add):
             self.notifications_queue_hist.append(">>>> " + message + "\n")
 
         self.setNextScreen(screen)
+
+    def refreshNotification(self, screen, message, add = True):
+        clear = lambda: os.system('clear')
+        clear()
+
+        self.notifications_queue.append(">>>> " + message + "\n")
+        if(add):
+            self.notifications_queue_hist.append(">>>> " + message + "\n")
+
+        if(screen == PRINCIPAL_MENU_SCR):
+            self.printPrincipalMenuScreen()
+        elif(screen == CHAT_SCR):
+            self.printChatScreen()
+        
         
             
 if __name__ == '__main__':
