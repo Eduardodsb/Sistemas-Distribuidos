@@ -15,10 +15,9 @@ OPEN_CHAT           = 'chat:'
 LOGOUT              = 'logout'
 
 #CHAT
-#OPEN_CHAT_DIFF_USER = 'chat: fabio_Junior19'
 CLOSE_CHAT          = 'fechar'
 DELETE_MESSAGES     = 'apagar'
-SEND_MESSAGE        = 'send' #Não é um comando digitado pelo usuário
+SEND_MESSAGE        = 'send' # Não é um comando digitado pelo usuário
 
 
 ####### SCREENS

@@ -6,6 +6,7 @@ import json
 ##### Messages returned constant variables
 INTERNAL_ERROR_SERVER   = 'Erro interno no servidor'
 INVALID_CREDENTIALS     = 'Credencial inválida'
+ALREADY_LOGGED          = 'Você já está logado em outra sessão'
 AUTHENTICATION_SUCCESS  = 'Logado com sucesso'
 LOGOUT_ERROR            = 'Não foi possível realizar o logout'
 METHOD_NOT_FOUND        = 'Método não encontrado'
@@ -15,9 +16,12 @@ CREATE_SUCCESS          = 'Criado com sucesso'
 DESCONNECTED_SUCCESS    = 'Desconectado com sucesso'
 
 class ProcessLayer:
-
+    """
+        Classe destinada à camada de processamento
+    """
+    
     #ProcessLayer.lock para acesso do dicionario 'conexoes'
-    lock        = threading.Lock()
+    lock        = threading.Lock() #Incializa o lock
     datalayer   = None
     users       = {}
 
@@ -25,21 +29,32 @@ class ProcessLayer:
         ProcessLayer.datalayer   = DataLayer("dataBase.json")
 
     def readUsers(self):
+        """
+            Responsável pela leitura dos dados do usuário
+        """  
         try:
             ProcessLayer.users = ProcessLayer.datalayer.readUsers()
         except Exception as e:
             print(e)
 
     def saveUsers(self):
+        """
+            Responsável por salva os dados dos usuários 
+        """  
         try:
             ProcessLayer.lock.acquire()
-            print(ProcessLayer.users)
             ProcessLayer.datalayer.writeUsers(ProcessLayer.users)
             ProcessLayer.lock.release()
         except Exception as e:
             print(e)
     
     def logoutClient(self, userName, password):
+        """
+            Desloga o cliente/usuário da aplicação
+            :param userName: user name do cliente/usuário
+            :param password: senha do cliente/usuário
+            :return retorna a mensagem de resposta da requisição de execução do comando
+        """  
         try:
             ProcessLayer.lock.acquire()
             if(userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password):
@@ -57,6 +72,12 @@ class ProcessLayer:
             return response
     
     def createClientAccount(self, userName, password):
+        """
+            Responsável pela criação de novos clientes/usuários no sistema
+            :param userName: user name do cliente/usuário
+            :param password: senha escolhida pelo cliente/usuário
+            :return retorna a mensagem de resposta da requisição de execução do comando
+        """  
         try:
             ProcessLayer.lock.acquire()
             if(userName not in ProcessLayer.users):
@@ -72,6 +93,12 @@ class ProcessLayer:
             return response
 
     def deleteClientAccount(self, userName, password):
+        """
+            Deleta o cliente/usuário da aplicação
+            :param userName: user name do cliente/usuário
+            :param password: senha do cliente/usuário
+            :return retorna a mensagem de resposta da requisição de execução do comando
+        """  
         try:
             ProcessLayer.lock.acquire()
             if(userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password):
@@ -88,14 +115,23 @@ class ProcessLayer:
             return response
 
     def authClientAccount(self, userName, password, ipAddress):
+        """
+            Realiza a autenticação do usuário.
+            :param userName: user name do cliente/usuário
+            :param password: senha do cliente/usuário
+            :param ipAddress:  ip e porta do cliente/usuário
+            :return retorna a mensagem de resposta da requisição de execução do comando
+        """  
         ip, port = ipAddress
         try:
             ProcessLayer.lock.acquire()
-            if(userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password):
+            if(userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password and ProcessLayer.users[userName].getStatus() == -1):
                 ProcessLayer.users[userName].setStatus(1)
                 ProcessLayer.users[userName].setIP(ip)
                 ProcessLayer.users[userName].setPort(port)
                 response = {'status':'success', 'method':'authAccount', 'data': {'message': AUTHENTICATION_SUCCESS}}
+            elif(userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password and ProcessLayer.users[userName].getStatus() != -1):
+                response = {'status':'error', 'method':'authAccount', 'data': {'message': ALREADY_LOGGED}}
             else:
                 response = {'status':'error', 'method':'authAccount', 'data': {'message': INVALID_CREDENTIALS}}
 
@@ -107,6 +143,12 @@ class ProcessLayer:
             return response
 
     def getClientStatus(self,  userName, password):
+        """
+            Busca nos dados do cliente/usuário o seu status.
+            :param userName: user name do cliente/usuário
+            :param password: senha do cliente/usuário
+            :return retorna a mensagem de resposta da requisição de execução do comando
+        """         
         try:
             ProcessLayer.lock.acquire()
             if(userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password):
@@ -122,6 +164,13 @@ class ProcessLayer:
             return response
 
     def setClientStatus(self, userName, password, status):
+        """
+            Altera o status do cliente/usuário
+            :param userName: user name do cliente/usuário
+            :param password: senha do cliente/usuário
+            :param status: status do cliente/usuário. Ex: 1 ou 0
+            :return retorna a mensagem de resposta da requisição de execução do comando
+        """ 
         try:
             ProcessLayer.lock.acquire()
             if(userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password):
@@ -140,6 +189,10 @@ class ProcessLayer:
             return response
 
     def getUsersList(self):
+        """
+            Busca todos os clientes/usuários cadastrados na aplicação.
+            :return retorna a mensagem de resposta da requisição de execução do comando
+        """ 
         result = []
         try:
             for key, value in ProcessLayer.users.items():
@@ -153,6 +206,11 @@ class ProcessLayer:
         return response
             
     def methodNotFound(self, _method):
+        """
+            Função chave chamada quando é tentado executar um método que não existe na aplicação.
+            :param _method: método passado
+            :return retorna a mensagem de resposta da requisição de execução do comando
+        """         
         return {'status':'error', 'method':_method,'data': {'message': METHOD_NOT_FOUND}} 
 
 

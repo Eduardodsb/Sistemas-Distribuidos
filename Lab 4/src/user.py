@@ -43,7 +43,6 @@ class User:
 
 
 if __name__ == '__main__':
-    test = User("tatalimpink", "1234", 0, "111.111.11", 1200)
-
+    test = User("nickname", "1234", 0, "111.111.11", 1200)
     print(test.__str__(True, True, False, False, True))
 

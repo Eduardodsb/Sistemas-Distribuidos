@@ -3,7 +3,10 @@ import json
 from user import User
 
 class DataLayer:
-
+    """
+        Classe destinada à leitura e escrita no arquivo destinado para guardar as informações essencias dos usuários
+    """
+         
     def __init__(self, filename):
         self._filename = filename
         self._path     = os.path.join("../", "data", filename)
@@ -47,6 +50,6 @@ class DataLayer:
 
 if __name__ == '__main__':
 
-    teste = DataLayer('infos.json')
+    teste = DataLayer('../data/dataBase.json')
     result = teste.readUsers()
     print(teste.writeUsers(result))
