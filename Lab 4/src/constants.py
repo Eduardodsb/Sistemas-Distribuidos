@@ -18,8 +18,6 @@ LOGOUT              = 'logout'
 #OPEN_CHAT_DIFF_USER = 'chat: fabio_Junior19'
 CLOSE_CHAT          = 'fechar'
 DELETE_MESSAGES     = 'apagar'
-OPEN_HIST_MESSAGES  = 'hist'
-CLOSE_HIST_MESSAGES = 'fechar hist'
 SEND_MESSAGE        = 'send' #Não é um comando digitado pelo usuário
 
 

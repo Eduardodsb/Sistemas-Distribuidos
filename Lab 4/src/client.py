@@ -6,7 +6,7 @@ import sys
 import os
 import random
 from clientInterface import ClientInterface
-from constants import LOGIN, LOGOUT, CREATE_ACCOUNT, DELETE_ACCOUNT, EXIT, ACTIVE_USERS, ACTIVE_STATUS, INACTIVE_STATUS, OPEN_CHAT, CLOSE_CHAT, DELETE_MESSAGES, OPEN_HIST_MESSAGES, CLOSE_HIST_MESSAGES, SEND_MESSAGE
+from constants import LOGIN, LOGOUT, CREATE_ACCOUNT, DELETE_ACCOUNT, EXIT, ACTIVE_USERS, ACTIVE_STATUS, INACTIVE_STATUS, OPEN_CHAT, CLOSE_CHAT, DELETE_MESSAGES, SEND_MESSAGE
 
 class Client:
 
@@ -14,10 +14,12 @@ class Client:
         self.serverHost         = serverHost        #Endereço do processo passivo
         self.serverPort         = serverPort        #Porta que o processo passivo estará escutando
         self.myPort             = None              #Porta que o cliente irá receber as conexões de outros clientes
+        self.sock               = None
         self.clientView         = ClientInterface() #Inicializa a classe responsável pela interface da aplicação
         self.userName           = ''
         self.password           = ''
         self.status             = -1
+        self.stopWorkers        = False
         self.chatUsersIps       = {} #Ips dos usuários cadastrados no sistema
         self.chatUsersPorts     = {} #Portas dos usuários cadastrados no sistema
         self.chatUsersStatus    = {} #Status dos usuários cadastrados no sistema
@@ -55,10 +57,19 @@ class Client:
             # Colocar a tela responsável por dizer que a conexão foi fechada por erro inesperado ou algo do tipo...
             sys.exit(1)
 
+    def stop(self):
+        self.sock.close()
+
+    def finishBusiness(self):
+        self.stopWorkers = True
+        sock = socket.socket()
+        sock.connect(('localhost', self.myPort))
+        sock.close()
+        
     def handlerServerRequest(self, method, userInput):
         methods = {CREATE_ACCOUNT: 'createAccount', DELETE_ACCOUNT: 'deleteAccount', LOGIN:'authAccount', ACTIVE_USERS:'getUsers', LOGOUT:'logout', EXIT:'logout', ACTIVE_STATUS:'setMyStatus', INACTIVE_STATUS:'setMyStatus'}
 
-        if(method in (CREATE_ACCOUNT, DELETE_ACCOUNT, LOGIN)):
+        if(method in (CREATE_ACCOUNT, DELETE_ACCOUNT)):
             userName, password = userInput
             request            = {'method':methods[method],'data':{'userName': userName,'password':password}}
 
@@ -79,7 +90,10 @@ class Client:
         elif(method in (LOGOUT, EXIT)):
             request = {'method':methods[method],'data':{'userName': self.userName,'password': self.password}}
 
-
+        print("heloooo")
+        print(request)
+        print("print sock")
+        print(self.sock)
         request_msg = json.dumps(request, ensure_ascii=False) #Gera o json para o envio da requisição ao servidor
         self.sock.send(bytes(request_msg,  encoding='utf-8')) #Envio da mensagem para o processo passivo
         
@@ -91,11 +105,11 @@ class Client:
     def handleServerResponse(self, method, response, userInput):
         
         if(method == LOGIN and response['status'] == 'success'):
-            userName, password = userInput
-            self.userName      = userName
-            self.clientView.username = self.userName
-            self.password      = password
-            self.status        = 1
+            userName, password          = userInput
+            self.userName               = userName
+            self.clientView.username    = self.userName
+            self.password               = password
+            self.status                 = 1
 
             work = threading.Thread(target= self.runAsPassive_P2P, args=())
             work.start()
@@ -108,6 +122,7 @@ class Client:
 
         if(method == LOGOUT and response['status'] == 'success'):
             self.status = -1
+            self.finishBusiness()
 
         if(method == OPEN_CHAT and response['status'] == 'success'):
             self.lock.acquire()
@@ -124,6 +139,54 @@ class Client:
             response = {'method':'openChat', 'status': 'error', 'data':{'message': None} }
             return response
 
+    def handleInterfaceCommand(self, cmd, userInput = None, response = None):
+        if(cmd == OPEN_CHAT):
+
+            if(userInput[5:] not in self.chatUsersStatus):
+                print('aqui 1')
+                response = {'method':'openChat', 'status': 'error', 'data':{'message': None} }
+            elif(userInput[:5] == OPEN_CHAT and self.status == 1 and (userInput[5:] in self.openChat and self.openChat[userInput[5:]] == 1) 
+            and self.chatUsersStatus[userInput[5:]] == '1'):
+                # Caso eu já tenha uma conversa ativa com o usuário em questão
+                print('aqui 2')
+                response = {'method':'openChat', 'status': 'success', 'data':{'message': None} }
+                self.clientView.openChatFriendUser = userInput[5:]
+            else:
+                response = self.handlerServerRequest(ACTIVE_USERS, None)
+                response = self.handleServerResponse(OPEN_CHAT,response,None)
+                if(response['status'] == 'success'):
+                    response = self.runAsActive_P2P(userInput)
+                    if(response['status'] == 'success'):
+                        self.clientView.openChatFriendUser = userInput[5:]
+
+        elif(cmd == CLOSE_CHAT):
+            self.clientView.openChatFriendUser = None
+            response = {'method':'closeChat', 'status': 'success', 'data':{'message': None} }
+
+        elif(cmd == LOGIN and (response['status'] == 'success')):
+            self.stopWorkers    = False
+            responseUpdate      = self.handlerServerRequest(ACTIVE_USERS, None)
+            self.handleServerResponse(OPEN_CHAT,responseUpdate,None)
+            
+            response = None
+
+        elif(cmd == DELETE_MESSAGES):
+            self.openChatMessages[self.clientView.openChatFriendUser] = []
+            response = {'method':'deleteMessages', 'status': 'success', 'data':{'message': None} }
+                    
+        elif(cmd == SEND_MESSAGE):
+            
+            self.lock.acquire()
+            self.openChatMessages[self.clientView.openChatFriendUser].append(self.userName + ":" + userInput)
+            if(self.clientView.openChatFriendUser not in self.fifoMessages):
+                    self.fifoMessages[self.clientView.openChatFriendUser] = []
+            self.fifoMessages[self.clientView.openChatFriendUser].append(userInput)
+            self.lock.release()
+
+            response = None
+            
+        return response
+
     def channelMessage(self, chatUserName, clientSock):
         request_msg = None
 
@@ -131,26 +194,20 @@ class Client:
             self.openChatMessages[chatUserName] = []
 
         while True:
-            #print('hehe')
+
             try:
                 request_msg = clientSock.recv(1024) #Recebe a mensagem do processo ativo
             except socket.timeout as e:
                 pass
-            #print('parte 1')
-            if(request_msg == b''): #Entra se receber logout ou esse cara
+
+            if(request_msg == b'' or self.stopWorkers): #Entra se receber logout ou esse cara
                 self.lock.acquire()
                 self.openChat[chatUserName] = 0
                 self.lock.release()
                 clientSock.close()
                 break
-            #print('parte 2')
+
             if(request_msg != None):
-                #Mensagem de confirmação de recebimento de requisição
-                # notifyReceivementMsg = {'method': 'sendMessage', 'status': 'success', 'data': None}
-                # notifyReceivement = json.dumps(notifyReceivementMsg, ensure_ascii=False) #Gera o json para o envio da requisição ao servidor
-                # clientSock.send(bytes(notifyReceivement,  enlocoding='utf-8')) #Envio da mensagem para o processo passivo
-                #print('parte 3')
- 
                 request_msg = str(request_msg, encoding='utf-8').replace('}{','}-#-{').split('-#-')
                 for r in request_msg:
                     request = json.loads(r)                
@@ -160,39 +217,24 @@ class Client:
                         self.lock.release()
                         clientSock.close()
                         break
-                    #print('parte 4')
+
                     self.lock.acquire()
                     self.openChatMessages[chatUserName].append(chatUserName + ":" + request['data']['message'])
                     self.lock.release()
-            #print('parte 5')        
+
             self.lock.acquire()
             for i in range(len(self.fifoMessages.get(chatUserName,[]))):
                 msg = self.fifoMessages[chatUserName][0] # {'fabio_Junior19': ["você:ola", "fabio_Junior19:ola", "fabio_Junior19:tudobom?"]}    
                 request = {'method': 'sendMessage', 'data':{'userName': self.userName, 'message': msg}}
                 request_msg = json.dumps(request, ensure_ascii=False) #Gera o json para o envio da requisição ao servidor
                 clientSock.send(bytes(request_msg,  encoding='utf-8')) #Envio da mensagem para o processo passivo
-                #print('parte 6')
-                # clientSock.setblocking(True)
-
-                # request_msg = clientSock.recv(1024) #Recebe a mensagem do processo ativo
-                # if(request_msg == b''): #Entra se receber logout ou esse cara
-                #     self.openChat[chatUserName] = 0
-                #     clientSock.close()
-                #     break
-                # #print('parte 7')
-                # request = json.loads(request_msg)
-                # print('testando request')
-                # print(request)
-                # if(request['status'] == 'success'):
                 self.fifoMessages[chatUserName].pop(0)
-            #print('parte 8')
+
             self.clientView.messages_queue = self.openChatMessages
             if(self.clientView.openChatFriendUser == chatUserName):
                 self.clientView.printChatScreen()
             self.lock.release()
-            #print('parte 9')
-            clientSock.setblocking(False)
-            clientSock.settimeout(0.5)
+
             request_msg = None
     
     def runAsActive_P2P(self, userInput):
@@ -214,6 +256,7 @@ class Client:
 
                 self.lock.acquire()
                 if(handshakeMsgDict['data']['userName'] != '' and handshakeMsgDict['data']['message'] == 'success'):
+                    self.openChat[userInput[5:]] = 1
                     sock_active.setblocking(False)
                     sock_active.settimeout(0.5)
                     worker = threading.Thread(target=self.channelMessage, args=(handshakeMsgDict['data']['userName'], sock_active))
@@ -249,7 +292,7 @@ class Client:
                 read, write, exception = select.select(inputs, [], [])
             
                 for trigger in read:
-                    if (trigger == sock and self.status == 1): #Caso o trigger seja um nova conexão
+                    if (trigger == sock and self.status == 1 and not self.stopWorkers): #Caso o trigger seja um nova conexão
                         try:                    
                             clientSock, ipAddress   = sock.accept() #Aceita a primeira conexão da fila e retorna um novo socket e o endereço do par ao qual se conectou. OBS: A chamada pode ser bloqueante
                             clientSock.setblocking(False)
@@ -284,6 +327,10 @@ class Client:
                             
                         finally:
                             handshakeMsg = None
+                    else:
+                        sock.close()
+                        return
+
         except Exception as a:
             print(e)
             self.stop()
@@ -305,9 +352,7 @@ class Client:
             elif(userInput == LOGIN):
                 userInput = self.clientView.authScreen()
                 response  = self.handlerServerRequest(LOGIN, userInput)
-                if(response['status'] == 'success'):
-                    responseUpdate = self.handlerServerRequest(ACTIVE_USERS, None)
-                    self.handleServerResponse(OPEN_CHAT,responseUpdate,None)
+                self.handleInterfaceCommand(LOGIN, response=response)
                 self.handleServerResponse(LOGIN, response, userInput)
                 self.clientView.handlerResponse(response)
             
@@ -326,46 +371,31 @@ class Client:
                 self.clientView.handlerResponse(response)
 
             elif(userInput[0:5] == OPEN_CHAT):
-                if(userInput[:5] == OPEN_CHAT and self.status == 1 and self.chatUsersStatus[userInput[5:]] == '1'
-                and (userInput[5:] in self.openChat and self.openChat[userInput[5:]] == 1)):
-                    response = {'method':'openChat', 'status': 'success', 'data':{'message': None} }
-                    self.clientView.openChatFriendUser = userInput[5:]
-                else:
-                    response = self.handlerServerRequest(ACTIVE_USERS, None)
-                    response = self.handleServerResponse(OPEN_CHAT,response,None)
-                    if(response['status'] == 'success'):
-                        response = self.runAsActive_P2P(userInput)
-                        if(response['status'] == 'success'):
-                            self.clientView.openChatFriendUser = userInput[5:]
+                response = self.handleInterfaceCommand(OPEN_CHAT, userInput = userInput)
                 self.clientView.handlerResponse(response)
             
             elif(userInput == LOGOUT):
                 response = self.handlerServerRequest(LOGOUT, None)
                 self.clientView.handlerResponse(response)
                 result = self.handleServerResponse(LOGOUT,response,None)
-                if(result):
-                    break
+                # if(result):
+                #     break
+
+            elif(userInput == CLOSE_CHAT):
+                response = self.handleInterfaceCommand(CLOSE_CHAT)
+                self.clientView.handlerResponse(response)
+                
+            
+            elif(userInput == DELETE_MESSAGES):
+                response = self.handleInterfaceCommand(DELETE_MESSAGES)
+                self.clientView.handlerResponse(response)
             
             elif(userInput == SEND_MESSAGE):
-                print('entrei')
-                self.lock.acquire()
-                print('openchatmessages print:')
-                print(self.openChatMessages)
-                self.openChatMessages[self.clientView.openChatFriendUser].append(self.userName + ":" + msg)
-                if(self.clientView.openChatFriendUser not in self.fifoMessages):
-                     self.fifoMessages[self.clientView.openChatFriendUser] = []
-                self.fifoMessages[self.clientView.openChatFriendUser].append(msg)
-                self.lock.release()
-                print('sai')
+                response = self.handleInterfaceCommand(SEND_MESSAGE, msg)
 
             userInput, msg = self.clientView.redirectScreen()
         
-        self.handlerServerRequest(EXIT,None)
         self.stop()
-
-    def stop(self):
-        self.sock.close()
-
 if __name__ == '__main__':
 
     client = Client(serverHost='localhost', serverPort = 5000)
