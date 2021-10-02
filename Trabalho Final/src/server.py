@@ -15,12 +15,13 @@ class Server:
         self.blocking                       = blocking         #Define se o socket será bloqueante ou não-bloqueante
         self.inputs                         = [sys.stdin]
         self.connections                    = {}               #Armazena histórico de conexões
-        self.usersSockets                   = {}               #Armazena uma relação userName-clientSocket
+        self.usersSocket                    = {}               #Armazena uma relação userName-clientSocket
         self.workers                        = []               #Armazena as threads criadas.
         self.notifyThread                   = None             #Thread responsável pelo envio das mensagens para os clientes
         self.pending_conn                   = pending_conn     #Número de conexões que o servidor espera
         self.processLayer                   = ProcessLayer()   #Inicializa a classe responsável pela camada de processamento
-        self.processLayer.readUsers()               #Lê os dados do usuário
+        self.processLayer.readUsers()                          #Lê os dados do usuário
+        self.processLayer.readChannels()                       #Lê os dados dos canais
         
         self.start()
 
@@ -66,7 +67,7 @@ class Server:
                 response = self.processLayer.logoutClient(request['data']['userName'], request['data']['password'])
 
                 if(response['status'] == 'success'):
-                    self.usersSockets.pop(request['data']['userName'])
+                    self.usersSocket.pop(request['data']['userName'])
                     
             elif(request['method'] == 'createAccount'):
                 response = self.processLayer.createClientAccount(request['data']['userName'], request['data']['password'])
@@ -75,13 +76,13 @@ class Server:
                 response = self.processLayer.deleteClientAccount(request['data']['userName'], request['data']['password'])
             
             elif(request['method'] == 'authAccount'):
-                response = self.processLayer.authClientAccount(request['data']['userName'], request['data']['password'], (ipAddress[0], request['data']['port']))
+                response = self.processLayer.authClientAccount(request['data']['userName'], request['data']['password'])
 
                 if(response['status'] == 'success'):
-                    self.usersSockets[request['data']['userName']] = clientSock
+                    self.usersSocket[request['data']['userName']] = clientSock
             
             elif(request['method'] == 'createChannel'):
-               response = self.processLayer.getClientStatus(request['data']['userName'], request['data']['password'], request['data']['channelName'])    
+               response = self.processLayer.createChannel(request['data']['userName'], request['data']['password'], request['data']['channelName'])    
 
             elif(request['method'] == 'subscribeChannel'):
                 response = self.processLayer.subscribeChannel(request['data']['userName'], request['data']['password'], request['data']['channelName'])
@@ -99,7 +100,7 @@ class Server:
                 response = self.processLayer.showAllChannels()
 
             elif(request['method'] == 'publishChannel'):
-               response = self.processLayer.publishChannel(request['data']['userName'], request['data']['password'], request['data']['channelName'])
+               response = self.processLayer.publishChannel(request['data']['userName'], request['data']['password'], request['data']['channelName'], request['data']['message'] )
             
             else:
                response = self.processLayer.methodNotFound(request['method'])
@@ -126,32 +127,25 @@ class Server:
         print('Servidor finalizado!')
 
         sys.exit(1)
-        
-    def findChannelWithMessage(self):
-        result = []
-
-        for name, ch in ProcessLayer.channels.items():
-            if ch.hasPublishedMessage():
-                result.append(ch)
-
-        return result
-    
+         
     
     def notify(self):
 
         while(self.SERVER_IS_ALIVE):
 
-            channels = self.findChannelWithMessage()
+            channels = self.processLayer.findChannelWithMessage()
             
             for channel in channels:
                 message = channel.getLastPublishedMessage()
                 if (message is None):
                     continue
+
                 for user in channel.getSubscribedUsers():
                     if(user in ProcessLayer.usersLogged):
                         clientSock = self.usersSocket[user]
 
-                        response_msg = json.dumps(message, ensure_ascii=False) #Gera o json para o envio da resposta ao cliente
+                        message_to_send = {'method':'notifySubscriber', 'data': {'message': message, 'channelName': channel.getName()}}
+                        response_msg = json.dumps(message_to_send, ensure_ascii=False) #Gera o json para o envio da resposta ao cliente
                         clientSock.send(bytes(response_msg,  encoding='utf-8')) #Envia mensagem de resposta para o cliente
 
 

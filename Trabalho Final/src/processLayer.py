@@ -61,7 +61,7 @@ class ProcessLayer:
             Responsável pela leitura dos dados dos canais
         """  
         try:
-            ProcessLayer.users = ProcessLayer.datalayer.readChannels()
+            ProcessLayer.channels = ProcessLayer.datalayer.readChannels()
         except Exception as e:
             print(e)
 
@@ -76,6 +76,16 @@ class ProcessLayer:
         except Exception as e:
             print(e)
     
+    def findChannelWithMessage(self):
+        result = []
+
+        ProcessLayer.lock.acquire()
+        for name, ch in ProcessLayer.channels.items():
+            if ch.hasPublishedMessage():
+                result.append(ch)
+        ProcessLayer.lock.release()
+        return result
+
     def logoutClient(self, userName, password):
         """
             Desloga o cliente/usuário da aplicação
@@ -157,7 +167,7 @@ class ProcessLayer:
             ProcessLayer.lock.release()
             return response
 
-    def authClientAccount(self, userName, password, ipAddress):
+    def authClientAccount(self, userName, password):
         """
             Realiza a autenticação do usuário.
             :param userName: user name do cliente/usuário
@@ -165,7 +175,6 @@ class ProcessLayer:
             :param ipAddress:  ip e porta do cliente/usuário
             :return retorna a mensagem de resposta da requisição de execução do comando
         """  
-        ip, port = ipAddress
         try:
             ProcessLayer.lock.acquire()
             if(userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password):
@@ -190,8 +199,9 @@ class ProcessLayer:
             :return retorna a mensagem de resposta da requisição de execução do comando
         """  
         try:
+            ProcessLayer.lock.acquire()
             if (channelName not in ProcessLayer.channels) :
-                ch = Channel(userName, channelName)                      # Cria um novo canal
+                ch = Channel(channelName, userName)                      # Cria um novo canal
                 ProcessLayer.channels[channelName] = ch                  # Atualiza a lista de canais com o novo canal
                 ProcessLayer.users[userName].addOwnChannel(channelName)  # Adiciona o novo canal na lista de canais em que o usuário é dono
                 response = {'status':'success', 'method':'createChannel', 'data': {'message': CREATE_SUCCESS}}
@@ -201,6 +211,7 @@ class ProcessLayer:
             print(e)
             response = {'status':'error', 'method':'createChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
+            ProcessLayer.lock.release()
             return response
             
     def subscribeChannel(self, userName, password, channelName):
@@ -212,6 +223,7 @@ class ProcessLayer:
             :return retorna a mensagem de resposta da requisição de execução do comando
         """  
         try: 
+            ProcessLayer.lock.acquire()
             userAuthenticated = userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password
             existChannel      = channelName in ProcessLayer.channels
             userNotOwner      = ProcessLayer.channels[channelName].getOwner() != userName
@@ -228,6 +240,7 @@ class ProcessLayer:
             print(e)
             response = {'status':'error', 'method':'subscribeChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
+            ProcessLayer.lock.release()
             return response
 
     def unsubscribeChannel(self, userName, password, channelName):
@@ -239,6 +252,7 @@ class ProcessLayer:
             :return retorna a mensagem de resposta da requisição de execução do comando
         """ 
         try:
+            ProcessLayer.lock.acquire()
             userAuthenticated   = userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password
             existChannel        = channelName in ProcessLayer.channels
             userNotOwner        = ProcessLayer.channels[channelName].getOwner() != userName
@@ -254,6 +268,7 @@ class ProcessLayer:
             print(e)
             response = {'status':'error', 'method':'unsubscribeChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
+            ProcessLayer.lock.release()
             return response
 
     def showMySubscriptions(self, userName, password):
@@ -287,8 +302,8 @@ class ProcessLayer:
         try:
             userAuthenticated = userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password
             if (userAuthenticated):
-                result = ProcessLayer.users[userName].getOwnChannels()
-                response = {'status':'success', 'method':'showMyOwnChannels', 'data': {'message': result}}
+                result   = ProcessLayer.users[userName].getOwnChannels()
+                response = {'status':'success', 'method':'showMyOwnChannels', 'data': result}
             else:
                 response = {'status':'error', 'method':'showMyOwnChannels', 'data': {'message': INVALID_CREDENTIALS}}
         except Exception as e:
@@ -303,36 +318,40 @@ class ProcessLayer:
             :return retorna a mensagem de resposta da requisição de execução do comando
         """ 
         try:
+            ProcessLayer.lock.acquire()
             result   = list(ProcessLayer.channels.keys())
             response = {'status':'success', 'method':'showAllChannels', 'data': result}
         except Exception as e:
             print(e)
             response = {'status':'error', 'method':'showAllChannels', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
+            ProcessLayer.lock.release()
             return response
 
-    def publishChannel(self, userName, message, channelName):
+    def publishChannel(self, userName, password, channelName, channelMessage):
         """
             Publica uma mensagem em um canal.
             :param userName: user name do cliente/usuário
             :param password: senha do cliente/usuário
             :param channelName: nome do canal em que a mensagem será publicada
+            :param message:mensagem que será publicada no canal
             :return retorna a mensagem de resposta da requisição de execução do comando
         """         
         try:
+            ProcessLayer.lock.acquire()
             userAuthenticated = userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password
             userOwner         = ProcessLayer.channels[channelName].getOwner() == userName
 
             if (userAuthenticated and userOwner):
-                ProcessLayer.channels[channelName].publishMessage(message)                
-                # ---- send mensage to subscribers -----
-                response = {'status':'success', 'method':'showAllChannels', 'data': {'message': PUBLISHED_SUCCESS}}
+                ProcessLayer.channels[channelName].publishMessage(channelMessage)                
+                response = {'status':'success', 'method':'publishChannel', 'data': {'message': PUBLISHED_SUCCESS}}
             else:
-                response = {'status':'error', 'method':'showAllChannels', 'data': {'message': INTERNAL_ERROR_SERVER}}
+                response = {'status':'error', 'method':'publishChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         except Exception as e:
             print(e)
-            response = {'status':'error', 'method':'showAllChannels', 'data': {'message': INTERNAL_ERROR_SERVER}}
+            response = {'status':'error', 'method':'publishChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
+            ProcessLayer.lock.release()
             return response
        
     def methodNotFound(self, _method):
