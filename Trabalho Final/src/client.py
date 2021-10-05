@@ -15,23 +15,16 @@ from constants import HOME_SCR, CREATE_ACCOUNT_SCR, DELETE_ACCOUNT_SCR, LOGIN_SC
 class Client:
 
     def __init__(self, serverHost='localhost', serverPort = 5000):
-        self.serverHost         = serverHost        #Endereço do processo passivo
-        self.serverPort         = serverPort        #Porta que o processo passivo estará escutando
-        self.myPort             = None              #Porta que o cliente irá receber as conexões de outros clientes
-        self.sock               = None              #Sock utilizado para se comunicar com o servidor
-        self.clientView         = ClientInterface() #Inicializa a classe responsável pela interface da aplicação
-        self.userName           = ''                #Guarda o user name do usuário
-        self.password           = ''                #Guarda a senha do usuário
-        self.status             = -1                #Guarda o status do usuário
-        self.stopWorkers        = False             #Variável chave para parar todas as threads trabalhadoras
-        self.chatUsersIps       = {}                #Ips dos usuários cadastrados no sistema
-        self.chatUsersPorts     = {}                #Portas dos usuários cadastrados no sistema
-        self.chatUsersStatus    = {}                #Status dos usuários cadastrados no sistema
-        self.openChat           = {}                #Usuários com os quais se mantém a conversa ativa
-        self.channelMessages    = []                #Guarda as menssagens recebidas de cada canal
-        self.fifoMessages       = {}                #Fila de envio de mensagens trocadas entre usuários. Ex:{'fabio_Junior19': ["você:ola", "fabio_Junior19:ola", "fabio_Junior19:tudobom?"]}
-        self.lock               = threading.Lock()  #Inicializa o lock
-        self.start()                                #Adquire o socket e se conecta com o servidor
+        self.serverHost             = serverHost        #Endereço do servidor
+        self.serverPort             = serverPort        #Porta do servidor
+        self.sock                   = None              #Sock utilizado para se comunicar com o servidor
+        self.clientView             = ClientInterface() #Inicializa a classe responsável pela interface da aplicação
+        self.userName               = ''                #Guarda o user name do usuário
+        self.password               = ''                #Guarda a senha do usuário
+        self.stopWorkers            = False             #Variável chave para parar todas as threads trabalhadoras
+        self.channelMessages        = []                #Guarda as menssagens recebidas de cada canal
+        self.lock                   = threading.Lock()  #Inicializa o lock
+        self.start()                                    #Adquire o socket e se conecta com o servidor
 
     def start(self):
         """
@@ -51,7 +44,7 @@ class Client:
 
     def finishBusiness(self):
         """
-            Termina as threads trabalhadoras e o fluxo passivo (P2P) do cliente.
+            Termina a threads runChannelListener, responsável por ouvir as mensagens recebidas dos diferentes canais.
         """        
         self.stopWorkers = True
     
@@ -61,7 +54,7 @@ class Client:
             :param notify: especifica se a mensagem é uma notificação ou não
             :return mensagem que apresenta a tag de interesse
         """
-        size = 1024
+        size            = 1024
         peeked_msg      = self.sock.recv(size, socket.MSG_PEEK)
         peeked_response = json.loads(peeked_msg)
 
@@ -91,12 +84,12 @@ class Client:
 
         elif(method == PUBLISH_CHANNEL):
             channelName = userInput[1][0]
-            message = userInput[1][1]
-            request = {'method':methods[method],'data':{'userName': self.userName,'password': self.password, 'channelName': channelName, 'message': message}}
+            message     = userInput[1][1]
+            request     = {'method':methods[method],'data':{'userName': self.userName,'password': self.password, 'channelName': channelName, 'message': message}}
 
         elif(method in (SUBSCRIBE_CHANNEL, UNSUBSCRIBE_CHANNEL, CREATE_CHANNEL)):
             channelName = userInput[1]
-            request = {'method':methods[method], 'data': {'userName': self.userName,'password': self.password,'channelName': channelName }}
+            request     = {'method':methods[method], 'data': {'userName': self.userName,'password': self.password,'channelName': channelName }}
         
         elif(method in (LOGOUT, SHOW_MY_SUBS, SHOW_MY_CHANNELS)):
             request = {'method':methods[method], 'data': {'userName': self.userName,'password': self.password}}
@@ -120,18 +113,18 @@ class Client:
             :param userInput: possíveis entradas digitadas pelo usuário
             :return void ou mensagem de retorno para a interface.
         """
-        #Atualiza as informação do usuário e iniciar o lado passivo do cliente para receber futuras conexões P2P
+        
+        #Atualiza as informação do usuário e inicia a thread resposável por escutar os diferentes canais que possuem mensagens publicadas.
         if(method == LOGIN and response['status'] == 'success'):
             userName, password          = userInput
             self.userName               = userName
             self.clientView.username    = self.userName
             self.password               = password
 
-            work = threading.Thread(target= self.runChannelListener, args=())
-            work.daemon = True # Kill threads when the main program exits
+            work                        = threading.Thread(target= self.runChannelListener, args=())
+            work.daemon                 = True #Mata a thread filha quando a thread principal morrer.
             work.start()
         
-        #Quando um usuário se desloga, é necessário trocar seu status para offline e terminar suas threads trabalhadoras associadas assim como o fluxo passivo
         if(method == LOGOUT and response['status'] == 'success'): 
             self.finishBusiness()
 
@@ -143,8 +136,7 @@ class Client:
             :param response: mensagem de resposta (dicionário).
             :return void ou mensagem de resposta (dicionário) para a classe clientInterface.
         """
-
-        #Ao se logar, deve-se atualizar as informações dos usuários cadastrados na aplicação 
+        
         if(cmd == LOGIN and (response['status'] == 'success')):
             self.stopWorkers    = False
             response            = None
@@ -265,6 +257,6 @@ class Client:
         self.stop()
 
 if __name__ == '__main__':
-
+    # Estas duas linhas devem ser mantidas para que o cliente execute.
     client = Client(serverHost='localhost', serverPort = 5000)
     client.run()

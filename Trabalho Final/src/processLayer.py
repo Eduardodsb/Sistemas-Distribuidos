@@ -7,11 +7,9 @@ import json
 ##### Messages returned constant variables
 INTERNAL_ERROR_SERVER   = 'Erro interno no servidor'
 INVALID_CREDENTIALS     = 'Credencial inválida'
-ALREADY_LOGGED          = 'Você já está logado em outra sessão'
 AUTHENTICATION_SUCCESS  = 'Logado com sucesso'
 LOGOUT_ERROR            = 'Não foi possível realizar o logout'
 METHOD_NOT_FOUND        = 'Método não encontrado'
-INVALID_STATUS          = 'Status inválido'
 DELETE_SUCCESS          = 'Deletado com sucesso'
 CREATE_SUCCESS          = 'Criado com sucesso'
 DESCONNECTED_SUCCESS    = 'Desconectado com sucesso'
@@ -25,17 +23,15 @@ class ProcessLayer:
         Classe destinada à camada de processamento
     """
     
-    #ProcessLayer.lock para acesso do dicionario 'conexoes'
-    lock        = threading.Lock() #Incializa o lock
-    datalayer   = None
-    users       = {}
-    usersLogged = {}
-    channels    = {}
+    lock        = threading.Lock()  #Incializa o lock
+    datalayer   = None              #Variável objeto para realizar as tarefas da Classe DataLayer
+    users       = {}                #Guarda as informações dos usuários
+    usersLogged = {}                #Guarda os usuários logados na aplicação
+    channels    = {}                #Guarda as informações dos canais
     
     def __init__(self):
-        ProcessLayer.datalayer   = DataLayer("userDatabase.json", "channelDatabase.json")
+        ProcessLayer.datalayer = DataLayer("userDatabase.json", "channelDatabase.json")
 
-        
     def readUsers(self):
         """
             Responsável pela leitura dos dados do usuário
@@ -77,14 +73,22 @@ class ProcessLayer:
             print(e)
     
     def findChannelWithMessage(self):
+        """
+            Identifica os canais que apresentam novas mensagems publicadas
+            :return retorna uma lista com os canais que possuem novas mensagens a serem enviadas para os inscritos
+        """  
         result = []
-
-        ProcessLayer.lock.acquire()
-        for name, ch in ProcessLayer.channels.items():
-            if ch.hasPublishedMessage():
-                result.append(ch)
-        ProcessLayer.lock.release()
-        return result
+        
+        try:
+            ProcessLayer.lock.acquire()
+            for name, ch in ProcessLayer.channels.items():
+                if ch.hasPublishedMessage():
+                    result.append(ch)
+            ProcessLayer.lock.release()
+        except Exception as e:
+            print(e)
+        finally:
+            return result
 
     def logoutClient(self, userName, password):
         """
@@ -101,7 +105,7 @@ class ProcessLayer:
             else:
                 response = {'status':'error', 'method':'logout', 'data': {'message': LOGOUT_ERROR}}
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'logout', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             ProcessLayer.lock.release()
@@ -122,7 +126,7 @@ class ProcessLayer:
             else:
                 response = {'status':'error', 'method':'createAccount', 'data': {'message': INTERNAL_ERROR_SERVER}}           
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'createAccount', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             ProcessLayer.lock.release()
@@ -161,7 +165,7 @@ class ProcessLayer:
             else:
                 response = {'status':'error', 'method':'deleteAccount', 'data': {'message': INVALID_CREDENTIALS}}           
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'deleteAccount', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             ProcessLayer.lock.release()
@@ -177,14 +181,14 @@ class ProcessLayer:
         """  
         try:
             ProcessLayer.lock.acquire()
-            if(userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password):
+            if(userName not in ProcessLayer.usersLogged and userName in ProcessLayer.users and ProcessLayer.users[userName].getPassword() == password):
                 ProcessLayer.usersLogged[userName] = ProcessLayer.users[userName]
                 response = {'status':'success', 'method':'authAccount', 'data': {'message': AUTHENTICATION_SUCCESS}}
             else:
                 response = {'status':'error', 'method':'authAccount', 'data': {'message': INVALID_CREDENTIALS}}
 
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'authAccount', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             ProcessLayer.lock.release()
@@ -201,14 +205,14 @@ class ProcessLayer:
         try:
             ProcessLayer.lock.acquire()
             if (channelName not in ProcessLayer.channels) :
-                ch = Channel(channelName, userName)                      # Cria um novo canal
+                ch = Channel(channelName, userName, [], [])                      # Cria um novo canal
                 ProcessLayer.channels[channelName] = ch                  # Atualiza a lista de canais com o novo canal
                 ProcessLayer.users[userName].addOwnChannel(channelName)  # Adiciona o novo canal na lista de canais em que o usuário é dono
                 response = {'status':'success', 'method':'createChannel', 'data': {'message': CREATE_SUCCESS}}
             else:
                 response = {'status':'error', 'method':'createChannel', 'data': {'message': CHANNEL_ALREADY_EXITS}}
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'createChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             ProcessLayer.lock.release()
@@ -237,7 +241,7 @@ class ProcessLayer:
                 response = {'status':'error', 'method':'subscribeChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
                 
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'subscribeChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             ProcessLayer.lock.release()
@@ -265,7 +269,7 @@ class ProcessLayer:
             else:
                 response = {'status':'error', 'method':'unsubscribeChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'unsubscribeChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             ProcessLayer.lock.release()
@@ -287,7 +291,7 @@ class ProcessLayer:
             else:
                 response = {'status':'error', 'method':'showMySubscriptions', 'data': {'message': INVALID_CREDENTIALS}}
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'showMySubscriptions', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             return response
@@ -307,7 +311,7 @@ class ProcessLayer:
             else:
                 response = {'status':'error', 'method':'showMyOwnChannels', 'data': {'message': INVALID_CREDENTIALS}}
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'showMyOwnChannels', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             return response
@@ -322,7 +326,7 @@ class ProcessLayer:
             result   = list(ProcessLayer.channels.keys())
             response = {'status':'success', 'method':'showAllChannels', 'data': result}
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'showAllChannels', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             ProcessLayer.lock.release()
@@ -348,7 +352,7 @@ class ProcessLayer:
             else:
                 response = {'status':'error', 'method':'publishChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         except Exception as e:
-            print(e)
+            #print(e)
             response = {'status':'error', 'method':'publishChannel', 'data': {'message': INTERNAL_ERROR_SERVER}}
         finally:
             ProcessLayer.lock.release()

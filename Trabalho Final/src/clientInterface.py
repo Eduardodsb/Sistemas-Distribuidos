@@ -11,7 +11,6 @@ class ClientInterface:
         self.messages_queue             = []        #Fila de mensagens .Ex: {'fabio_Junior19': ["você:ola", "fabio_Junior19:ola", "fabio_Junior19:tudobom?"]}
         self.responsesToPrint           = []        #Fila de repostas do servidor que devem ser printadas no console
         self.MAX_MSGS_SHOW              = 20        #Número máximo de mensagens trocadas entre os usuários que serão apresentadas na tela 
-        self.openChatFriendUser         = ""        #Nome do usuário com quem se conversa
         self.username                   = ""        #Nome do usuário da aplicação em si
         self.notifications_queue        = []        #Fila que armazena as notificações
         self.notifications_queue_hist   = []        #Fila que guarda o histórico de notificações
@@ -69,9 +68,6 @@ class ClientInterface:
         """         
         self.currScreen = CREATE_ACCOUNT_SCR
 
-        #if(self.notifications_queue):
-        #    print(self.notifications_queue[len(self.notifications_queue) - 1])
-
         print('<=====Criando Seu Perfil=====>\n')
         
         userName     = input('Digite o usuário: ')
@@ -106,28 +102,29 @@ class ClientInterface:
         """         
         self.currScreen = PRINCIPAL_MENU_SCR
 
-        userInput = input()
+        userInput       = input()
+
         while ((userInput not in [LOGOUT, SHOW_MY_SUBS, SHOW_MY_CHANNELS, SHOW_ALL_CHANNELS]) and
         (CREATE_CHANNEL not in userInput) and (SUBSCRIBE_CHANNEL not in userInput) and
         (UNSUBSCRIBE_CHANNEL not in userInput) and (PUBLISH_CHANNEL not in userInput)):
             print('Comando incorreto. Digite um comando válido.')
             userInput = input()
 
-        
-        result      = None
-        infos  = userInput.split(':')
+        print(self.messages_queue)
+        result  = None
+        infos   = userInput.split(':')
         
         if(infos[0] in PUBLISH_CHANNEL):
             cmd              = infos[0]
             channelName, msg = infos[1].split('<')
             result           = (cmd, (channelName, msg))
         elif(infos[0] in [CREATE_CHANNEL, SUBSCRIBE_CHANNEL, UNSUBSCRIBE_CHANNEL]):
-            cmd             = infos[0]
-            channelName     = infos[1]
-            result          = (cmd, channelName)
+            cmd              = infos[0]
+            channelName      = infos[1]
+            result           = (cmd, channelName)
         else:
-            cmd             = infos[0]
-            result          = (cmd, None)
+            cmd              = infos[0]
+            result           = (cmd, None)
             
         return result
 
@@ -139,6 +136,7 @@ class ClientInterface:
         if(self.canClear):
             clear = lambda: os.system('clear')
             clear()
+
         self.currScreen = PRINCIPAL_MENU_SCR
 
         if(self.notifications_queue):
@@ -157,17 +155,16 @@ class ClientInterface:
         print(f'Digite "{LOGOUT}" para se deslogar da sua conta.\n')
         print('<=========================================================>\n')      
 
-        print('<================Informações==============================>\n')  
         if(self.responsesToPrint):
+            print('<================Informações==============================>\n')  
             print(self.responsesToPrint[-1])
 
-        print('<================Mensagens dos Canais=====================>\n')  
         messagesToPrint = self.messages_queue[-self.MAX_MSGS_SHOW:]
-        for msg in messagesToPrint:
-            print(msg)
+        if(messagesToPrint):
+            print('<================Mensagens dos Canais=====================>\n')
+            for msg in messagesToPrint:
+                print(msg)
         
-        
-
     def handlerResponse(self, response):
         """
             Responsável por tratar as respostas vindas do back e ajustar a interface caso necessário
@@ -308,5 +305,6 @@ class ClientInterface:
 
             
 if __name__ == '__main__':
-    teste = ClientInterface()
-    teste.home()
+    pass
+    #teste = ClientInterface()
+    #teste.home()

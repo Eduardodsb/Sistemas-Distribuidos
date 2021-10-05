@@ -12,9 +12,6 @@ class User:
         strSubscribedChannels = '["'+ str("\",\"".join(self._subscribedChannels)) + '"]' if self._subscribedChannels else '[]'
         return '{' + ' "userName":"{}", "password":"{}", "ownChannels":{}, "subscribedChannels":{}'.format(self._userName, self._password, strOwnChannels, strSubscribedChannels)  +'}'
     
-    #def __str__(self, userName = True, password = True, ownChannels = True, subscribedChannels = True):
-    #    return '{' + ('"userName":"'+ self._userName + '",' if userName else "" ) + ('"password":"'+ self._password + '",' if password else "" ) + ('"ownChannels":[\"'+ str("\",\"".join(self._ownChannels)) + '\"],' if ownChannels else "" ) + ('"subscribedChannels":[\"'+ str("\",\"".join(self._subscribedChannels)) + '\"]' if subscribedChannels else "" ) +'}'
-
     def __repr__(self):
         return self.__str__()
 
@@ -49,6 +46,7 @@ class User:
         self._subscribedChannels.remove(channelName)
 
 if __name__ == '__main__':
-    test = User("nickname", "1234", ['a', 'b'], ['c'])
+    pass
+    #test = User("nickname", "1234", ['a', 'b'], ['c'])
     #print(test.__str__(True, True, True, True))
-    print(test.__str__())
+    #print(test.__str__())

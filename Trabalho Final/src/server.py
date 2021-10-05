@@ -13,7 +13,7 @@ class Server:
         self.host                           = host             #'' possibilita acessar qualquer endereco alcancavel da maquina local 
         self.port                           = port             #Porta utilizada pelo processo para ouvir as mensagens
         self.blocking                       = blocking         #Define se o socket será bloqueante ou não-bloqueante
-        self.inputs                         = [sys.stdin]
+        self.inputs                         = [sys.stdin]      #Lista que guarda o socket e o stdin
         self.connections                    = {}               #Armazena histórico de conexões
         self.usersSocket                    = {}               #Armazena uma relação userName-clientSocket
         self.workers                        = []               #Armazena as threads criadas.
@@ -23,7 +23,7 @@ class Server:
         self.processLayer.readUsers()                          #Lê os dados do usuário
         self.processLayer.readChannels()                       #Lê os dados dos canais
         
-        self.start()
+        self.start()                                           #Inicia o servidor em relação ao seu socket
 
     def start(self):
         """
@@ -130,7 +130,10 @@ class Server:
          
     
     def notify(self):
-
+        """
+            Método responsável por identificar se ocorreu alguma publicação em algum canal e repassar a mensagem para os usuários que estão
+            inscritos nos mesmos. 
+        """ 
         while(self.SERVER_IS_ALIVE):
 
             channels = self.processLayer.findChannelWithMessage()
@@ -210,5 +213,6 @@ class Server:
                 self.stop()
 
 if __name__ == '__main__':
+    # Estas duas linhas devem ser mantidas para que o servidor execute.
     server = Server(host = '', port = 5000, pending_conn = 100, blocking = False)
     server.run()

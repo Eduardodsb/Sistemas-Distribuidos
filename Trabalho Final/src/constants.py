@@ -16,8 +16,6 @@ PUBLISH_CHANNEL     = 'publicar'
 SHOW_MY_CHANNELS    = 'ver_meus_canais'
 SHOW_ALL_CHANNELS   = 'ver_canais'
 
-
-
 ####### SCREENS
 HOME_SCR            = 'home_scr'
 LOGIN_SCR           = 'login_scr'
