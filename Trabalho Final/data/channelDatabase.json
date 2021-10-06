@@ -1,1 +1,31 @@
-{"cac": {"channelName": "cac", "owner": "admin", "subscribedUsers": [], "publishedMessages": []}, "ufrj": {"channelName": "ufrj", "owner": "taina", "subscribedUsers": ["edu", "rafa"], "publishedMessages": []}, "dcc": {"channelName": "dcc", "owner": "rafa", "subscribedUsers": [], "publishedMessages": []}, "spotted": {"channelName": "spotted", "owner": "edu", "subscribedUsers": ["taina"], "publishedMessages": []}}
+{
+    "cac": {
+        "channelName": "cac",
+        "owner": "admin",
+        "subscribedUsers": [],
+        "publishedMessages": []
+    },
+    "dcc": {
+        "channelName": "dcc",
+        "owner": "rafa",
+        "subscribedUsers": [
+            "edu",
+            "taina"
+        ],
+        "publishedMessages": []
+    },
+    "spotted": {
+        "channelName": "spotted",
+        "owner": "edu",
+        "subscribedUsers": [
+            "taina"
+        ],
+        "publishedMessages": []
+    },
+    "ufrj": {
+        "channelName": "ufrj",
+        "owner": "taina",
+        "subscribedUsers": [],
+        "publishedMessages": []
+    }
+}

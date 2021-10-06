@@ -146,7 +146,6 @@ class Server:
                 for user in channel.getSubscribedUsers():
                     if(user in ProcessLayer.usersLogged):
                         clientSock = self.usersSocket[user]
-
                         message_to_send = {'method':'notifySubscriber', 'data': {'message': message, 'channelName': channel.getName()}}
                         response_msg = json.dumps(message_to_send, ensure_ascii=False) #Gera o json para o envio da resposta ao cliente
                         clientSock.send(bytes(response_msg,  encoding='utf-8')) #Envia mensagem de resposta para o cliente

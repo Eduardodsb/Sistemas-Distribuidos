@@ -105,12 +105,11 @@ class ClientInterface:
         userInput       = input()
 
         while ((userInput not in [LOGOUT, SHOW_MY_SUBS, SHOW_MY_CHANNELS, SHOW_ALL_CHANNELS]) and
-        (CREATE_CHANNEL not in userInput) and (SUBSCRIBE_CHANNEL not in userInput) and
-        (UNSUBSCRIBE_CHANNEL not in userInput) and (PUBLISH_CHANNEL not in userInput)):
+        (CREATE_CHANNEL + ":" not in userInput) and (SUBSCRIBE_CHANNEL + ":" not in userInput) and
+        (UNSUBSCRIBE_CHANNEL + ":" not in userInput) and (PUBLISH_CHANNEL + ":" not in userInput or '<' not in userInput)):
             print('Comando incorreto. Digite um comando válido.')
             userInput = input()
 
-        print(self.messages_queue)
         result  = None
         infos   = userInput.split(':')
         

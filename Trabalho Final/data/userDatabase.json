@@ -1,1 +1,40 @@
-{"admin": {"userName": "admin", "password": "123", "ownChannels": ["cac"], "subscribedChannels": []}, "taina": {"userName": "taina", "password": "tai", "ownChannels": ["ufrj"], "subscribedChannels": ["spotted"]}, "edu": {"userName": "edu", "password": "123", "ownChannels": ["spotted"], "subscribedChannels": ["ufrj"]}, "rafa": {"userName": "rafa", "password": "1234", "ownChannels": ["dcc"], "subscribedChannels": ["ufrj"]}}
+{
+    "admin": {
+        "userName": "admin",
+        "password": "123",
+        "ownChannels": [
+            "cac"
+        ],
+        "subscribedChannels": []
+    },
+    "taina": {
+        "userName": "taina",
+        "password": "tai",
+        "ownChannels": [
+            "ufrj"
+        ],
+        "subscribedChannels": [
+            "spotted"
+        ]
+    },
+    "edu": {
+        "userName": "edu",
+        "password": "123",
+        "ownChannels": [
+            "spotted"
+        ],
+        "subscribedChannels": [
+            "ufrj"
+        ]
+    },
+    "rafa": {
+        "userName": "rafa",
+        "password": "1234",
+        "ownChannels": [
+            "dcc"
+        ],
+        "subscribedChannels": [
+            "ufrj"
+        ]
+    }
+}
